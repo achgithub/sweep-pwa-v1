@@ -37,14 +37,16 @@ function DateEditor({ value, onSave, onCancel }: {
     if (date) onSave(`${date}T${time || '12:00'}`)
   }
 
+  const compact = { minHeight: 36, padding: '4px 10px', fontSize: 13 } as const
+
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
       <input type="date" value={date} onChange={e => setDate(e.target.value)}
-        style={{ flex: 1, minWidth: 120, fontSize: 12 }} autoFocus />
+        style={{ flex: 1, minWidth: 120, ...compact }} autoFocus />
       <input type="time" value={time} onChange={e => setTime(e.target.value)}
-        style={{ width: 90, fontSize: 12 }} />
+        style={{ width: 86, ...compact }} />
       <button className="btn btn-primary btn-sm" onClick={save} disabled={!date}>Save</button>
-      <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+      <button className="btn btn-ghost btn-sm" onClick={onCancel}>✕</button>
     </div>
   )
 }
@@ -433,7 +435,7 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
           {matches.map(match => (
             <div key={match.id} className="card" style={{ gap: 6, flexDirection: 'column', alignItems: 'stretch' }}>
-              {/* Teams + score row */}
+              {/* Teams + actions on one row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13, textAlign: 'right' }}>
                   {match.homeTeamName}
@@ -444,8 +446,17 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>
                   {match.awayTeamName}
                 </span>
+                {match.status !== 'complete' && (
+                  <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }}
+                    onClick={() => { setScoringMatch(match.id); setHomeScore(''); setAwayScore('') }}>
+                    Score
+                  </button>
+                )}
+                <button className="btn-icon" style={{ flexShrink: 0 }} onClick={() => deleteMatch(match.id)}>
+                  <i className="ti ti-x" />
+                </button>
               </div>
-              {/* Date + actions row */}
+              {/* Date badge row */}
               {editingDateId === match.id ? (
                 <DateEditor
                   value={match.scheduledAt}
@@ -453,19 +464,7 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
                   onCancel={() => setEditingDateId(null)}
                 />
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <DateBadge scheduledAt={match.scheduledAt} onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
-                  <div style={{ flex: 1 }} />
-                  {match.status !== 'complete' && (
-                    <button className="btn btn-secondary btn-sm"
-                      onClick={() => { setScoringMatch(match.id); setHomeScore(''); setAwayScore('') }}>
-                      Score
-                    </button>
-                  )}
-                  <button className="btn-icon" onClick={() => deleteMatch(match.id)}>
-                    <i className="ti ti-x" />
-                  </button>
-                </div>
+                <DateBadge scheduledAt={match.scheduledAt} onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
               )}
               {scoringMatch === match.id && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -720,7 +719,7 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
               )}
             </div>
 
-            {/* Date + actions row */}
+            {/* Date badge row */}
             {editingDateId === match.id ? (
               <DateEditor
                 value={match.scheduledAt}
@@ -728,9 +727,7 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
                 onCancel={() => setEditingDateId(null)}
               />
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <DateBadge scheduledAt={match.scheduledAt} onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
-              </div>
+              <DateBadge scheduledAt={match.scheduledAt} onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
             )}
 
             {/* Score entry */}
