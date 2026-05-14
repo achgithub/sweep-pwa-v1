@@ -136,6 +136,10 @@ function GroupsPanel({ detail, onRefresh }: Props) {
   async function addGroup(e: React.FormEvent) {
     e.preventDefault()
     if (!groupName.trim()) return
+    if (groups.some(g => g.name.toLowerCase() === groupName.trim().toLowerCase())) {
+      setError(`"${groupName.trim()}" already exists`)
+      return
+    }
     setAddingGroup(true)
     setError('')
     try {
@@ -180,8 +184,9 @@ function GroupsPanel({ detail, onRefresh }: Props) {
           {groups.map(group => {
             const groupMembers  = members.filter(m => m.groupId === group.id)
             const groupMatches  = matches.filter(m => m.groupId === group.id)
-            const assignedIds   = groupMembers.map(m => m.teamId)
-            const available     = teams.filter(t => !assignedIds.includes(t.id))
+            // Exclude teams already in ANY group, not just this one
+            const allAssignedIds = members.map(m => m.teamId)
+            const available     = teams.filter(t => !allAssignedIds.includes(t.id))
             return (
               <GroupSection
                 key={group.id}
