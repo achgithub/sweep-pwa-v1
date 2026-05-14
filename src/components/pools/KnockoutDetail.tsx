@@ -49,6 +49,10 @@ function TeamsPanel({ detail, onRefresh }: Props) {
   async function addTeam(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
+    if (teams.some(t => t.name.toLowerCase() === name.trim().toLowerCase())) {
+      setError(`"${name.trim()}" is already in this pool`)
+      return
+    }
     setAdding(true)
     setError('')
     try {
@@ -270,6 +274,19 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
     }
   }
 
+  async function updateMatchDate(matchId: number, scheduledAt: string) {
+    try {
+      await api.patch(`/pools/${poolId}/group-matches/${matchId}`, {
+        homeScore: undefined,
+        awayScore: undefined,
+        scheduledAt,
+      })
+      onRefresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed')
+    }
+  }
+
   async function deleteMatch(matchId: number) {
     try {
       await api.delete(`/pools/${poolId}/group-matches/${matchId}`)
@@ -379,11 +396,20 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
                   </button>
                 </div>
               </div>
-              {match.scheduledAt && (
+              {/* Date — always editable until complete */}
+              {match.status !== 'complete' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>Date &amp; time</label>
+                  <input type="datetime-local"
+                    defaultValue={match.scheduledAt?.slice(0, 16) ?? ''}
+                    onBlur={e => e.target.value && updateMatchDate(match.id, e.target.value)}
+                    style={{ flex: 1, fontSize: 12 }} />
+                </div>
+              ) : match.scheduledAt ? (
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
                   {new Date(match.scheduledAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                 </div>
-              )}
+              ) : null}
               {scoringMatch === match.id && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="number" min={0} value={homeScore} onChange={e => setHomeScore(e.target.value)}
@@ -422,14 +448,15 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
               ))}
             </select>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <label style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>Date &amp; time</label>
             <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)}
               style={{ flex: 1 }} />
-            <button type="submit" className="btn btn-primary btn-sm"
-              disabled={addingMatch || !homeId || !awayId || homeId === awayId}>
-              {addingMatch ? <span className="spinner" /> : 'Add fixture'}
-            </button>
           </div>
+          <button type="submit" className="btn btn-primary btn-sm"
+            disabled={addingMatch || !homeId || !awayId || homeId === awayId}>
+            {addingMatch ? <span className="spinner" /> : 'Add fixture'}
+          </button>
         </form>
       )}
     </div>
@@ -575,7 +602,15 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
       {error && <div className="alert alert-error" style={{ marginBottom: 8, fontSize: 12 }}>{error}</div>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {matches.map(match => (
+        {matches.map(match => {
+          // Teams already assigned elsewhere in this stage (exclude current match's own picks)
+          const usedInStage = matches
+            .filter(m => m.id !== match.id)
+            .flatMap(m => [m.homeTeamId, m.awayTeamId].filter(Boolean) as number[])
+          const availableHome = teams.filter(t => t.id !== match.awayTeamId && !usedInStage.includes(t.id))
+          const availableAway = teams.filter(t => t.id !== match.homeTeamId && !usedInStage.includes(t.id))
+
+          return (
           <div key={match.id} className="card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Home team */}
@@ -583,7 +618,7 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
                 <select style={{ flex: 1, fontSize: 13 }}
                   onChange={e => e.target.value && setTeam(match.id, 'home', Number(e.target.value))}>
                   <option value="">Select home team</option>
-                  {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {availableHome.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               ) : (
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13, textAlign: 'right' }}>
@@ -603,7 +638,7 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
                 <select style={{ flex: 1, fontSize: 13 }}
                   onChange={e => e.target.value && setTeam(match.id, 'away', Number(e.target.value))}>
                   <option value="">Select away team</option>
-                  {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {availableAway.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               ) : (
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>
@@ -653,7 +688,8 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
               </div>
             )}
           </div>
-        ))}
+        )
+        })}
       </div>
     </div>
   )

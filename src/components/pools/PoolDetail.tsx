@@ -17,7 +17,9 @@ export default function PoolDetail({ poolId, onBack }: Props) {
   useEffect(() => { load() }, [poolId])
 
   async function load() {
-    setLoading(true)
+    // Only show full-screen spinner on first load — subsequent refreshes
+    // update data silently so child tab state is preserved
+    if (!detail) setLoading(true)
     try {
       const data = await api.get<PoolDetailType>(`/pools/${poolId}`)
       setDetail(data)

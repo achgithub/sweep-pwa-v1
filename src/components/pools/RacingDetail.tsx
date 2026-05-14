@@ -17,6 +17,10 @@ export default function RacingDetail({ detail, onRefresh }: Props) {
   async function addRunner(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
+    if (runners.some(r => r.name.toLowerCase() === name.trim().toLowerCase())) {
+      setError(`"${name.trim()}" is already in this pool`)
+      return
+    }
     setAdding(true)
     setError('')
     try {

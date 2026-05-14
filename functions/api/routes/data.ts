@@ -457,19 +457,26 @@ data.patch('/pools/:id/group-matches/:matchId', async (c) => {
   if (!pool) return c.json({ error: 'Not found' }, 404)
   if (userRole !== 'admin' && pool.owner_id !== userId) return c.json({ error: 'Forbidden' }, 403)
 
-  const body = await c.req.json<{ homeScore: number; awayScore: number }>()
+  const body = await c.req.json<{ homeScore?: number; awayScore?: number; scheduledAt?: string }>()
 
-  // Update match result
-  await c.env.DB.prepare(`
-    UPDATE group_matches SET home_score = ?, away_score = ?, status = 'complete' WHERE id = ?
-  `).bind(body.homeScore, body.awayScore, matchId).run()
+  // Date-only update
+  if (body.scheduledAt !== undefined && body.homeScore === undefined) {
+    await c.env.DB.prepare('UPDATE group_matches SET scheduled_at = ? WHERE id = ?')
+      .bind(body.scheduledAt, matchId).run()
+    return c.json({ ok: true })
+  }
 
-  // Recalculate standings for the group
-  const match = await c.env.DB.prepare(`
-    SELECT group_id, home_team_id, away_team_id FROM group_matches WHERE id = ?
-  `).bind(matchId).first<{ group_id: number; home_team_id: number; away_team_id: number }>()
+  // Score update
+  if (body.homeScore !== undefined && body.awayScore !== undefined) {
+    await c.env.DB.prepare(`
+      UPDATE group_matches SET home_score = ?, away_score = ?, status = 'complete' WHERE id = ?
+    `).bind(body.homeScore, body.awayScore, matchId).run()
 
-  if (match) await recalcGroupStandings(c.env.DB, match.group_id)
+    const match = await c.env.DB.prepare(`
+      SELECT group_id FROM group_matches WHERE id = ?
+    `).bind(matchId).first<{ group_id: number }>()
+    if (match) await recalcGroupStandings(c.env.DB, match.group_id)
+  }
 
   return c.json({ ok: true })
 })
