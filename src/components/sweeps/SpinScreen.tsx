@@ -53,7 +53,7 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
 
       // Exclude the winner from the cycling names so it only appears at the reveal
       const cycleNames = poolOptions.map(o => o.name).filter(n => n !== winner)
-      const PRE = 24
+      const PRE = 48
       const seq: string[] = []
       while (seq.length < PRE && cycleNames.length > 0) {
         seq.push(...[...cycleNames].sort(() => Math.random() - 0.5))
@@ -67,8 +67,8 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
         i++
         if (i >= seq.length) { setPhase('result'); return }
         const progress = i / seq.length
-        // Fast start (35ms), steep cubic deceleration, long pause at end
-        timerRef.current = setTimeout(tick, 35 + Math.pow(progress, 3) * 1100)
+        // Fast start (35ms), quintic deceleration — stays fast for ~60% then drops sharply
+        timerRef.current = setTimeout(tick, 35 + Math.pow(progress, 5) * 1400)
       }
       tick()
 
