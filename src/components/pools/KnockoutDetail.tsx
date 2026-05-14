@@ -14,12 +14,38 @@ function fmtDate(iso: string | undefined) {
   })
 }
 
-function DateBadge({ scheduledAt, onEdit }: { scheduledAt?: string; onEdit: () => void }) {
+function DateBadge({ scheduledAt, onEdit }: { scheduledAt?: string; onEdit?: () => void }) {
+  const cls = scheduledAt ? 'badge-open' : 'badge-pending'
   return (
-    <span className="badge badge-open" style={{ cursor: 'pointer' }} onClick={onEdit}>
+    <span className={`badge ${cls}`} style={{ cursor: onEdit ? 'pointer' : 'default' }} onClick={onEdit}>
       <i className="ti ti-calendar" style={{ fontSize: 10 }} aria-hidden="true" />
       {scheduledAt ? fmtDate(scheduledAt) : 'Set date & time'}
     </span>
+  )
+}
+
+function DateEditor({ value, onSave, onCancel }: {
+  value?: string
+  onSave: (iso: string) => void
+  onCancel: () => void
+}) {
+  const existing = value?.slice(0, 16) ?? ''
+  const [date, setDate] = useState(existing.slice(0, 10))
+  const [time, setTime] = useState(existing.slice(11, 16) || '12:00')
+
+  function save() {
+    if (date) onSave(`${date}T${time || '12:00'}`)
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)}
+        style={{ flex: 1, minWidth: 120, fontSize: 12 }} autoFocus />
+      <input type="time" value={time} onChange={e => setTime(e.target.value)}
+        style={{ width: 90, fontSize: 12 }} />
+      <button className="btn btn-primary btn-sm" onClick={save} disabled={!date}>Save</button>
+      <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+    </div>
   )
 }
 
@@ -246,7 +272,8 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
   const [addTeamId, setAddTeamId] = useState('')
   const [homeId, setHomeId] = useState('')
   const [awayId, setAwayId] = useState('')
-  const [scheduledAt, setScheduledAt] = useState('')
+  const [addDate, setAddDate] = useState('')
+  const [addTime, setAddTime] = useState('12:00')
   const [addingMatch, setAddingMatch] = useState(false)
   const [scoringMatch, setScoringMatch] = useState<number | null>(null)
   const [editingDateId, setEditingDateId] = useState<number | null>(null)
@@ -283,9 +310,9 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
         groupId: group.id,
         homeTeamId: Number(homeId),
         awayTeamId: Number(awayId),
-        scheduledAt: scheduledAt || null,
+        scheduledAt: addDate ? `${addDate}T${addTime || '12:00'}` : null,
       })
-      setHomeId(''); setAwayId(''); setScheduledAt('')
+      setHomeId(''); setAwayId(''); setAddDate(''); setAddTime('12:00')
       onRefresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed')
@@ -405,20 +432,30 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
       {matches.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
           {matches.map(match => (
-            <div key={match.id} className="card" style={{ gap: 8, flexDirection: 'column', alignItems: 'stretch' }}>
+            <div key={match.id} className="card" style={{ gap: 6, flexDirection: 'column', alignItems: 'stretch' }}>
+              {/* Teams + score row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13, textAlign: 'right' }}>
                   {match.homeTeamName}
                 </span>
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)', minWidth: 40, textAlign: 'center' }}>
-                  {match.status === 'complete'
-                    ? `${match.homeScore} – ${match.awayScore}`
-                    : 'vs'}
+                  {match.status === 'complete' ? `${match.homeScore} – ${match.awayScore}` : 'vs'}
                 </span>
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>
                   {match.awayTeamName}
                 </span>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+              </div>
+              {/* Date + actions row */}
+              {editingDateId === match.id ? (
+                <DateEditor
+                  value={match.scheduledAt}
+                  onSave={v => { updateMatchDate(match.id, v); setEditingDateId(null) }}
+                  onCancel={() => setEditingDateId(null)}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <DateBadge scheduledAt={match.scheduledAt} onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
+                  <div style={{ flex: 1 }} />
                   {match.status !== 'complete' && (
                     <button className="btn btn-secondary btn-sm"
                       onClick={() => { setScoringMatch(match.id); setHomeScore(''); setAwayScore('') }}>
@@ -429,25 +466,6 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
                     <i className="ti ti-x" />
                   </button>
                 </div>
-              </div>
-              {/* Date badge */}
-              {match.status === 'complete' ? (
-                match.scheduledAt && (
-                  <span className="badge badge-completed">
-                    <i className="ti ti-calendar" style={{ fontSize: 10 }} aria-hidden="true" />
-                    {fmtDate(match.scheduledAt)}
-                  </span>
-                )
-              ) : editingDateId === match.id ? (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="datetime-local" autoFocus
-                    defaultValue={match.scheduledAt?.slice(0, 16) ?? ''}
-                    onBlur={e => { if (e.target.value) updateMatchDate(match.id, e.target.value); setEditingDateId(null) }}
-                    style={{ flex: 1, fontSize: 12 }} />
-                  <button className="btn btn-ghost btn-sm" onClick={() => setEditingDateId(null)}>Done</button>
-                </div>
-              ) : (
-                <DateBadge scheduledAt={match.scheduledAt} onEdit={() => setEditingDateId(match.id)} />
               )}
               {scoringMatch === match.id && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -487,10 +505,11 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
               ))}
             </select>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <label style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>Date &amp; time</label>
-            <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input type="date" value={addDate} onChange={e => setAddDate(e.target.value)}
               style={{ flex: 1 }} />
+            <input type="time" value={addTime} onChange={e => setAddTime(e.target.value)}
+              style={{ width: 100 }} />
           </div>
           <button type="submit" className="btn btn-primary btn-sm"
             disabled={addingMatch || !homeId || !awayId || homeId === awayId}>
@@ -701,24 +720,17 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
               )}
             </div>
 
-            {/* Date badge */}
-            {match.status === 'complete' ? (
-              match.scheduledAt && (
-                <span className="badge badge-completed">
-                  <i className="ti ti-calendar" style={{ fontSize: 10 }} aria-hidden="true" />
-                  {fmtDate(match.scheduledAt)}
-                </span>
-              )
-            ) : editingDateId === match.id ? (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="datetime-local" autoFocus
-                  defaultValue={match.scheduledAt?.slice(0, 16) ?? ''}
-                  onBlur={e => { if (e.target.value) setSchedule(match.id, e.target.value); setEditingDateId(null) }}
-                  style={{ flex: 1, fontSize: 12 }} />
-                <button className="btn btn-ghost btn-sm" onClick={() => setEditingDateId(null)}>Done</button>
-              </div>
+            {/* Date + actions row */}
+            {editingDateId === match.id ? (
+              <DateEditor
+                value={match.scheduledAt}
+                onSave={v => { setSchedule(match.id, v); setEditingDateId(null) }}
+                onCancel={() => setEditingDateId(null)}
+              />
             ) : (
-              <DateBadge scheduledAt={match.scheduledAt} onEdit={() => setEditingDateId(match.id)} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <DateBadge scheduledAt={match.scheduledAt} onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
+              </div>
             )}
 
             {/* Score entry */}
