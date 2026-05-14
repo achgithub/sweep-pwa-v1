@@ -1,9 +1,14 @@
-import { precacheAndRoute } from 'workbox-precaching'
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
 
 declare let self: ServiceWorkerGlobalScope
 
 precacheAndRoute(self.__WB_MANIFEST)
+cleanupOutdatedCaches()
 
-self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+// Take control immediately on install — no waiting for tabs to close
+self.addEventListener('install', () => { self.skipWaiting() })
+
+// Claim all open tabs as soon as the new SW activates
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
 })
