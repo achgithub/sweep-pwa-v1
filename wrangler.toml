@@ -1,0 +1,11 @@
+name = "sweep-pwa-v1"
+compatibility_date = "2025-05-02"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sweep-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+# JWT_SECRET is set as an encrypted Secret in the Cloudflare dashboard
