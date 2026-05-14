@@ -67,8 +67,9 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
         i++
         if (i >= seq.length) { setPhase('result'); return }
         const progress = i / seq.length
-        // Fast start (35ms), quintic deceleration — stays fast for ~60% then drops sharply
-        timerRef.current = setTimeout(tick, 35 + Math.pow(progress, 5) * 1400)
+        // Flat 35ms until 75%, then cubic drop over the final 25%
+        const p = Math.max(0, (progress - 0.75) / 0.25)
+        timerRef.current = setTimeout(tick, 35 + Math.pow(p, 3) * 1600)
       }
       tick()
 
