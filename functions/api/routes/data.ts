@@ -605,7 +605,7 @@ data.get('/competitions', async (c) => {
   return c.json(rows.results)
 })
 
-data.post('/competitions', requireRole('manager'), async (c) => {
+data.post('/competitions', requireRole('manager', 'admin'), async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json<{ poolId: number; name: string; prizePositions: string[] }>()
 
@@ -754,7 +754,7 @@ data.get('/players', async (c) => {
   return c.json(rows.results)
 })
 
-data.post('/players', requireRole('manager'), async (c) => {
+data.post('/players', requireRole('manager', 'admin'), async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json<{ name: string }>()
   if (!body.name?.trim()) return c.json({ error: 'Name required' }, 400)
@@ -770,7 +770,7 @@ data.post('/players', requireRole('manager'), async (c) => {
   return c.json(player, 201)
 })
 
-data.delete('/players/:id', requireRole('manager'), async (c) => {
+data.delete('/players/:id', requireRole('manager', 'admin'), async (c) => {
   const userId   = c.get('userId')
   const playerId = Number(c.req.param('id'))
 
@@ -788,7 +788,7 @@ data.delete('/players/:id', requireRole('manager'), async (c) => {
 // ── Entries & Spin ────────────────────────────────────────────────────────
 
 // POST /competitions/:id/entries — add an unspun entry for a player
-data.post('/competitions/:id/entries', requireRole('manager'), async (c) => {
+data.post('/competitions/:id/entries', requireRole('manager', 'admin'), async (c) => {
   const userId = c.get('userId')
   const compId = Number(c.req.param('id'))
   const body   = await c.req.json<{ playerId: number }>()
@@ -806,7 +806,7 @@ data.post('/competitions/:id/entries', requireRole('manager'), async (c) => {
 })
 
 // POST /competitions/:id/entries/:entryId/spin — assign random unassigned runner/team
-data.post('/competitions/:id/entries/:entryId/spin', requireRole('manager'), async (c) => {
+data.post('/competitions/:id/entries/:entryId/spin', requireRole('manager', 'admin'), async (c) => {
   const userId  = c.get('userId')
   const compId  = Number(c.req.param('id'))
   const entryId = Number(c.req.param('entryId'))
@@ -869,7 +869,7 @@ data.post('/competitions/:id/entries/:entryId/spin', requireRole('manager'), asy
 })
 
 // DELETE /competitions/:id/entries/:entryId — remove an unspun entry
-data.delete('/competitions/:id/entries/:entryId', requireRole('manager'), async (c) => {
+data.delete('/competitions/:id/entries/:entryId', requireRole('manager', 'admin'), async (c) => {
   const userId  = c.get('userId')
   const compId  = Number(c.req.param('id'))
   const entryId = Number(c.req.param('entryId'))
@@ -888,7 +888,7 @@ data.delete('/competitions/:id/entries/:entryId', requireRole('manager'), async 
 // ── Competition Results ───────────────────────────────────────────────────
 
 // PUT /competitions/:id/results — set prize position winners
-data.put('/competitions/:id/results', requireRole('manager'), async (c) => {
+data.put('/competitions/:id/results', requireRole('manager', 'admin'), async (c) => {
   const userId = c.get('userId')
   const compId = Number(c.req.param('id'))
 
