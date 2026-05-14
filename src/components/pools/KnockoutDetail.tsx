@@ -163,16 +163,28 @@ function GroupsPanel({ detail, onRefresh }: Props) {
     }
   }
 
+  const groupNameDuplicate = groupName.trim() !== '' &&
+    groups.some(g => g.name.toLowerCase() === groupName.trim().toLowerCase())
+
   return (
     <>
       {error && <div className="alert alert-error" style={{ marginBottom: 12 }}>{error}</div>}
 
-      <form onSubmit={addGroup} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <input type="text" value={groupName} onChange={e => setGroupName(e.target.value)}
-          placeholder="Group name e.g. Group A" style={{ flex: 1 }} />
-        <button type="submit" className="btn btn-primary btn-sm" disabled={addingGroup || !groupName.trim()}>
-          {addingGroup ? <span className="spinner" /> : <><i className="ti ti-plus" /> Add</>}
-        </button>
+      <form onSubmit={addGroup} style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input type="text" value={groupName} onChange={e => { setGroupName(e.target.value); setError('') }}
+            placeholder="Group name e.g. Group A"
+            style={{ flex: 1, borderColor: groupNameDuplicate ? 'var(--red-border)' : undefined }} />
+          <button type="submit" className="btn btn-primary btn-sm"
+            disabled={addingGroup || !groupName.trim() || groupNameDuplicate}>
+            {addingGroup ? <span className="spinner" /> : <><i className="ti ti-plus" /> Add</>}
+          </button>
+        </div>
+        {groupNameDuplicate && (
+          <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>
+            "{groupName.trim()}" already exists
+          </div>
+        )}
       </form>
 
       {groups.length === 0 ? (

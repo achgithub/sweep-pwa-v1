@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../../api/client'
 import type { PoolDetail as PoolDetailType } from '../../types'
 import RacingDetail from './RacingDetail'
@@ -13,16 +13,21 @@ export default function PoolDetail({ poolId, onBack }: Props) {
   const [detail, setDetail] = useState<PoolDetailType | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Track whether the initial load has completed — never set back to true
+  // so that refresh calls don't unmount child components and reset their state
+  const hasLoaded = useRef(false)
 
-  useEffect(() => { load() }, [poolId])
+  useEffect(() => {
+    hasLoaded.current = false
+    load()
+  }, [poolId])
 
   async function load() {
-    // Only show full-screen spinner on first load — subsequent refreshes
-    // update data silently so child tab state is preserved
-    if (!detail) setLoading(true)
+    if (!hasLoaded.current) setLoading(true)
     try {
       const data = await api.get<PoolDetailType>(`/pools/${poolId}`)
       setDetail(data)
+      hasLoaded.current = true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
@@ -73,7 +78,7 @@ function StatusPill({ poolId, currentStatus, onUpdate }: {
 }) {
   const [saving, setSaving] = useState(false)
   const next: Record<string, string> = { setup: 'active', active: 'complete', complete: 'setup' }
-  const cls: Record<string, string> = { setup: 'badge-pending', active: 'badge-active', complete: 'badge-completed' }
+  const cls: Record<string, string>  = { setup: 'badge-pending', active: 'badge-active', complete: 'badge-completed' }
 
   async function cycle() {
     setSaving(true)
