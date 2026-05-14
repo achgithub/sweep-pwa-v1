@@ -51,12 +51,12 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
           : {}),
       }
 
-      const names = poolOptions.map(o => o.name)
+      // Exclude the winner from the cycling names so it only appears at the reveal
+      const cycleNames = poolOptions.map(o => o.name).filter(n => n !== winner)
       const PRE = 24
-      // Shuffle-fill so small pools don't repeat in order
       const seq: string[] = []
-      while (seq.length < PRE) {
-        seq.push(...[...names].sort(() => Math.random() - 0.5))
+      while (seq.length < PRE && cycleNames.length > 0) {
+        seq.push(...[...cycleNames].sort(() => Math.random() - 0.5))
       }
       seq.splice(PRE)
       seq.push(winner)
