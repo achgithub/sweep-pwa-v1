@@ -96,7 +96,7 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
       {phase !== 'spinning' && (
         <button
           className="btn-icon"
-          style={{ position: 'absolute', top: 18, left: 16, zIndex: 2 }}
+          style={{ position: 'absolute', top: 'calc(18px + env(safe-area-inset-top))', left: 16, zIndex: 2 }}
           onClick={isResult ? () => onComplete(resultRef.current!) : onCancel}
         >
           <i className="ti ti-arrow-left" style={{ fontSize: 20 }} />

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <rect width="180" height="180" fill="#141414"/>
+  <circle cx="18" cy="18" r="65" fill="rgba(129,140,248,0.22)"/>
+  <circle cx="162" cy="162" r="52" fill="rgba(52,211,153,0.16)"/>
+  <!-- Wheel ring -->
+  <circle cx="90" cy="88" r="68" fill="none" stroke="rgba(129,140,248,0.35)" stroke-width="3" stroke-dasharray="14 7"/>
+  <!-- Pointer dot at top -->
+  <circle cx="90" cy="20" r="5" fill="#34d399"/>
+  <!-- S -->
+  <text x="90" y="108" font-family="'Inter',system-ui,sans-serif" font-size="88"
+        font-weight="800" text-anchor="middle" fill="#ffffff">S</text>
+  <!-- Emerald underline -->
+  <rect x="58" y="121" width="64" height="5" rx="2.5" fill="#34d399"/>
+</svg>

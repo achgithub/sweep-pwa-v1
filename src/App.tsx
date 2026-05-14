@@ -57,7 +57,7 @@ function Shell() {
       <div className="blob blob-emerald" aria-hidden="true" />
 
       {/* Top bar */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px 0', position: 'relative', zIndex: 1 }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'calc(14px + env(safe-area-inset-top)) 18px 0', position: 'relative', zIndex: 1 }}>
         <div className="app-logo">
           <span style={{ color: 'var(--indigo)' }}>Sweep</span>
         </div>
