@@ -13,8 +13,6 @@ export default function PoolDetail({ poolId, onBack }: Props) {
   const [detail, setDetail] = useState<PoolDetailType | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // Track whether the initial load has completed — never set back to true
-  // so that refresh calls don't unmount child components and reset their state
   const hasLoaded = useRef(false)
 
   useEffect(() => {

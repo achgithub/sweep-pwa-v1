@@ -13,37 +13,39 @@ data.get('/sync', async (c) => {
 
   const isAdmin = userRole === 'admin'
 
-  const pools = await c.env.DB.prepare(`
-    SELECT p.id, p.owner_id as ownerId, u.name as ownerName,
-           p.copied_from_id as copiedFromId, p.name, p.type,
-           p.has_group_stage as hasGroupStage, p.status, p.created_at as createdAt
-    FROM pools p
-    JOIN users u ON u.id = p.owner_id
-    WHERE ${isAdmin ? '1=1' : 'p.owner_id = ?'}
-    ORDER BY p.created_at DESC
-  `).bind(...(isAdmin ? [] : [userId])).all()
+  const [pools, competitions, players] = await Promise.all([
+    c.env.DB.prepare(`
+      SELECT p.id, p.owner_id as ownerId, u.name as ownerName,
+             p.copied_from_id as copiedFromId, p.name, p.type,
+             p.has_group_stage as hasGroupStage, p.status, p.created_at as createdAt
+      FROM pools p
+      JOIN users u ON u.id = p.owner_id
+      WHERE ${isAdmin ? '1=1' : 'p.owner_id = ?'}
+      ORDER BY p.created_at DESC
+    `).bind(...(isAdmin ? [] : [userId])).all(),
 
-  const competitions = await c.env.DB.prepare(`
-    SELECT c.id, c.manager_id as managerId, u.name as managerName,
-           c.pool_id as poolId, p.name as poolName, p.type as poolType,
-           c.name, c.status, c.created_at as createdAt,
-           (SELECT COUNT(*) FROM entries e WHERE e.competition_id = c.id) as entryCount,
-           (SELECT COUNT(*) FROM entries e WHERE e.competition_id = c.id AND e.spun_at IS NOT NULL) as spunCount
-    FROM competitions c
-    JOIN users u ON u.id = c.manager_id
-    JOIN pools p ON p.id = c.pool_id
-    WHERE ${isAdmin ? '1=1' : 'c.manager_id = ?'}
-    ORDER BY c.created_at DESC
-  `).bind(...(isAdmin ? [] : [userId])).all()
+    c.env.DB.prepare(`
+      SELECT c.id, c.manager_id as managerId, u.name as managerName,
+             c.pool_id as poolId, p.name as poolName, p.type as poolType,
+             c.name, c.status, c.created_at as createdAt,
+             (SELECT COUNT(*) FROM entries e WHERE e.competition_id = c.id) as entryCount,
+             (SELECT COUNT(*) FROM entries e WHERE e.competition_id = c.id AND e.spun_at IS NOT NULL) as spunCount
+      FROM competitions c
+      JOIN users u ON u.id = c.manager_id
+      JOIN pools p ON p.id = c.pool_id
+      WHERE ${isAdmin ? '1=1' : 'c.manager_id = ?'}
+      ORDER BY c.created_at DESC
+    `).bind(...(isAdmin ? [] : [userId])).all(),
 
-  const players = await c.env.DB.prepare(`
-    SELECT pl.id, pl.manager_id as managerId, u.name as managerName,
-           pl.name, pl.created_at as createdAt
-    FROM players pl
-    JOIN users u ON u.id = pl.manager_id
-    WHERE ${isAdmin ? '1=1' : 'pl.manager_id = ?'}
-    ORDER BY pl.name ASC
-  `).bind(...(isAdmin ? [] : [userId])).all()
+    c.env.DB.prepare(`
+      SELECT pl.id, pl.manager_id as managerId, u.name as managerName,
+             pl.name, pl.created_at as createdAt
+      FROM players pl
+      JOIN users u ON u.id = pl.manager_id
+      WHERE ${isAdmin ? '1=1' : 'pl.manager_id = ?'}
+      ORDER BY pl.name ASC
+    `).bind(...(isAdmin ? [] : [userId])).all(),
+  ])
 
   return c.json({ pools: pools.results, competitions: competitions.results, players: players.results })
 })
@@ -929,45 +931,37 @@ data.get('/managers', requireRole('admin'), async (c) => {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 async function recalcGroupStandings(db: D1Database, groupId: number) {
-  // Reset all standings for the group
-  await db.prepare('UPDATE group_memberships SET played=0, won=0, drawn=0, lost=0, gf=0, ga=0, points=0 WHERE group_id = ?').bind(groupId).run()
-
   const matches = await db.prepare(`
     SELECT home_team_id, away_team_id, home_score, away_score
     FROM group_matches WHERE group_id = ? AND status = 'complete'
   `).bind(groupId).all<{ home_team_id: number; away_team_id: number; home_score: number; away_score: number }>()
 
-  for (const m of matches.results) {
-    const homeWon  = m.home_score > m.away_score
-    const awayWon  = m.away_score > m.home_score
-    const drawn    = m.home_score === m.away_score
-    const homePts  = homeWon ? 3 : drawn ? 1 : 0
-    const awayPts  = awayWon ? 3 : drawn ? 1 : 0
-
-    await db.prepare(`
-      UPDATE group_memberships SET
-        played = played + 1,
-        won    = won    + ?,
-        drawn  = drawn  + ?,
-        lost   = lost   + ?,
-        gf     = gf     + ?,
-        ga     = ga     + ?,
-        points = points + ?
-      WHERE group_id = ? AND team_id = ?
-    `).bind(homeWon ? 1 : 0, drawn ? 1 : 0, awayWon ? 1 : 0, m.home_score, m.away_score, homePts, groupId, m.home_team_id).run()
-
-    await db.prepare(`
-      UPDATE group_memberships SET
-        played = played + 1,
-        won    = won    + ?,
-        drawn  = drawn  + ?,
-        lost   = lost   + ?,
-        gf     = gf     + ?,
-        ga     = ga     + ?,
-        points = points + ?
-      WHERE group_id = ? AND team_id = ?
-    `).bind(awayWon ? 1 : 0, drawn ? 1 : 0, homeWon ? 1 : 0, m.away_score, m.home_score, awayPts, groupId, m.away_team_id).run()
+  // Compute aggregates in memory, then issue one UPDATE per team via batch
+  const stats = new Map<number, { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; points: number }>()
+  const team  = (id: number) => {
+    if (!stats.has(id)) stats.set(id, { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 })
+    return stats.get(id)!
   }
+
+  for (const m of matches.results) {
+    const homeWon = m.home_score > m.away_score
+    const awayWon = m.away_score > m.home_score
+    const drawn   = m.home_score === m.away_score
+    const h = team(m.home_team_id)
+    const a = team(m.away_team_id)
+    h.played++; h.gf += m.home_score; h.ga += m.away_score
+    a.played++; a.gf += m.away_score; a.ga += m.home_score
+    if (homeWon)  { h.won++;   h.points += 3; a.lost++ }
+    else if (drawn) { h.drawn++; h.points++;   a.drawn++; a.points++ }
+    else          { a.won++;   a.points += 3; h.lost++ }
+  }
+
+  const stmt = (teamId: number, s: ReturnType<typeof team>) =>
+    db.prepare(`UPDATE group_memberships SET played=?,won=?,drawn=?,lost=?,gf=?,ga=?,points=? WHERE group_id=? AND team_id=?`)
+      .bind(s.played, s.won, s.drawn, s.lost, s.gf, s.ga, s.points, groupId, teamId)
+
+  const resetStmt = db.prepare('UPDATE group_memberships SET played=0,won=0,drawn=0,lost=0,gf=0,ga=0,points=0 WHERE group_id=?').bind(groupId)
+  await db.batch([resetStmt, ...[...stats.entries()].map(([id, s]) => stmt(id, s))])
 }
 
 async function advanceWinner(db: D1Database, _poolId: number, stageId: number, matchId: number, winnerId: number) {

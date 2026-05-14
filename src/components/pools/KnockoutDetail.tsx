@@ -239,12 +239,12 @@ function GroupsPanel({ detail, onRefresh }: Props) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {groups.map(group => {
-            const groupMembers  = members.filter(m => m.groupId === group.id)
-            const groupMatches  = matches.filter(m => m.groupId === group.id)
-            // Exclude teams already in ANY group, not just this one
-            const allAssignedIds = members.map(m => m.teamId)
-            const available     = teams.filter(t => !allAssignedIds.includes(t.id))
+          {(() => {
+            const assignedIds = new Set(members.map(m => m.teamId))
+            const unassigned  = teams.filter(t => !assignedIds.has(t.id))
+            return groups.map(group => {
+            const groupMembers = members.filter(m => m.groupId === group.id)
+            const groupMatches = matches.filter(m => m.groupId === group.id)
             return (
               <GroupSection
                 key={group.id}
@@ -252,12 +252,13 @@ function GroupsPanel({ detail, onRefresh }: Props) {
                 group={group}
                 members={groupMembers}
                 matches={groupMatches}
-                availableTeams={available}
+                availableTeams={unassigned}
                 onRefresh={onRefresh}
                 onDelete={() => deleteGroup(group)}
               />
             )
-          })}
+          })
+          })()}
         </div>
       )}
     </>
@@ -414,19 +415,22 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
               </tr>
             </thead>
             <tbody>
-              {sorted.map(m => (
+              {sorted.map(m => {
+                const gd = m.gf - m.ga
+                return (
                 <tr key={m.teamId}>
                   <td style={{ fontWeight: 600 }}>{m.teamName}</td>
                   <td style={{ textAlign: 'center' }}>{m.played}</td>
                   <td style={{ textAlign: 'center' }}>{m.won}</td>
                   <td style={{ textAlign: 'center' }}>{m.drawn}</td>
                   <td style={{ textAlign: 'center' }}>{m.lost}</td>
-                  <td style={{ textAlign: 'center', color: m.gf - m.ga >= 0 ? 'var(--emerald)' : 'var(--red)' }}>
-                    {m.gf - m.ga >= 0 ? '+' : ''}{m.gf - m.ga}
+                  <td style={{ textAlign: 'center', color: gd >= 0 ? 'var(--emerald)' : 'var(--red)' }}>
+                    {gd >= 0 ? '+' : ''}{gd}
                   </td>
                   <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--indigo)' }}>{m.points}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -663,13 +667,11 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
       {error && <div className="alert alert-error" style={{ marginBottom: 8, fontSize: 12 }}>{error}</div>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {matches.map(match => {
-          // Teams already assigned elsewhere in this stage (exclude current match's own picks)
-          const usedInStage = matches
-            .filter(m => m.id !== match.id)
-            .flatMap(m => [m.homeTeamId, m.awayTeamId].filter(Boolean) as number[])
-          const availableHome = teams.filter(t => t.id !== match.awayTeamId && !usedInStage.includes(t.id))
-          const availableAway = teams.filter(t => t.id !== match.homeTeamId && !usedInStage.includes(t.id))
+        {(() => {
+          const allUsed = new Set(matches.flatMap(m => [m.homeTeamId, m.awayTeamId].filter(Boolean) as number[]))
+          return matches.map(match => {
+          const availableHome = teams.filter(t => !allUsed.has(t.id) || t.id === match.homeTeamId)
+          const availableAway = teams.filter(t => !allUsed.has(t.id) || t.id === match.awayTeamId)
 
           return (
           <div key={match.id} className="card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
@@ -727,15 +729,12 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
               )}
             </div>
 
-            {/* Date badge row */}
-            {editingDateId === match.id ? (
+            {editingDateId === match.id && (
               <DateEditor
                 value={match.scheduledAt}
                 onSave={v => { setSchedule(match.id, v); setEditingDateId(null) }}
                 onCancel={() => setEditingDateId(null)}
               />
-            ) : (
-              <DateBadge scheduledAt={match.scheduledAt} onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
             )}
 
             {/* Score entry */}
@@ -758,7 +757,8 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
             )}
           </div>
         )
-        })}
+        })
+        })()}
       </div>
     </div>
   )
