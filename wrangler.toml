@@ -5,7 +5,7 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "sweep-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "f8510b63-f4c7-480b-8994-ca17eac9bc46"
 
 [vars]
 # JWT_SECRET is set as an encrypted Secret in the Cloudflare dashboard
