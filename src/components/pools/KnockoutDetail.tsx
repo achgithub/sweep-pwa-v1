@@ -216,8 +216,6 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
   const [awayScore, setAwayScore] = useState('')
   const [error, setError] = useState('')
 
-  const allTeams = [...members.map(m => ({ id: m.teamId, name: m.teamName })), ...availableTeams]
-
   async function addMember() {
     if (!addTeamId) return
     try {
