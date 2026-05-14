@@ -195,12 +195,12 @@ data.get('/pools/:id', async (c) => {
       const matches = await c.env.DB.prepare(`
         SELECT gm.id, gm.group_id as groupId,
                gm.home_team_id as homeTeamId, ht.name as homeTeamName,
-               gm.away_team_id as awayTeamId, at.name as awayTeamName,
+               gm.away_team_id as awayTeamId, awt.name as awayTeamName,
                gm.scheduled_at as scheduledAt, gm.home_score as homeScore,
                gm.away_score as awayScore, gm.status, gm.created_at as createdAt
         FROM group_matches gm
-        JOIN teams ht ON ht.id = gm.home_team_id
-        JOIN teams at ON at.id = gm.away_team_id
+        JOIN teams ht  ON ht.id  = gm.home_team_id
+        JOIN teams awt ON awt.id = gm.away_team_id
         WHERE gm.group_id IN (SELECT id FROM tournament_groups WHERE pool_id = ?)
         ORDER BY gm.scheduled_at ASC
       `).bind(poolId).all()
@@ -213,15 +213,15 @@ data.get('/pools/:id', async (c) => {
     const knockoutMatches = await c.env.DB.prepare(`
       SELECT km.id, km.stage_id as stageId, km.match_number as matchNumber,
              km.home_team_id as homeTeamId, ht.name as homeTeamName,
-             km.away_team_id as awayTeamId, at.name as awayTeamName,
+             km.away_team_id as awayTeamId, awt.name as awayTeamName,
              km.scheduled_at as scheduledAt, km.home_score as homeScore,
              km.away_score as awayScore,
              km.winner_team_id as winnerTeamId, wt.name as winnerTeamName,
              km.status, km.created_at as createdAt
       FROM knockout_matches km
-      LEFT JOIN teams ht ON ht.id = km.home_team_id
-      LEFT JOIN teams at ON at.id = km.away_team_id
-      LEFT JOIN teams wt ON wt.id = km.winner_team_id
+      LEFT JOIN teams ht  ON ht.id  = km.home_team_id
+      LEFT JOIN teams awt ON awt.id = km.away_team_id
+      LEFT JOIN teams wt  ON wt.id  = km.winner_team_id
       WHERE km.stage_id IN (SELECT id FROM knockout_stages WHERE pool_id = ?)
       ORDER BY km.stage_id, km.match_number
     `).bind(poolId).all()
