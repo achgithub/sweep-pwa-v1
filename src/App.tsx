@@ -11,9 +11,29 @@ import ManagersTab from './components/ManagersTab'
 
 type Tab = 'sweeps' | 'pools' | 'players' | 'managers'
 
+function useUpdateAvailable() {
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.ready.then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing
+        if (!newWorker) return
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            setUpdateAvailable(true)
+          }
+        })
+      })
+    })
+  }, [])
+  return updateAvailable
+}
+
 function Shell() {
   const { user, isAdmin, logout } = useAuth()
   const [tab, setTab] = useState<Tab>('sweeps')
+  const updateAvailable = useUpdateAvailable()
 
   const managerNav: { id: Tab; label: string; icon: string }[] = [
     { id: 'sweeps',  label: 'Sweeps',  icon: 'ti-trophy' },
@@ -54,6 +74,13 @@ function Shell() {
           <button className="ghost-pill" onClick={logout}>Sign out</button>
         </div>
       </header>
+
+      {/* Update banner */}
+      {updateAvailable && (
+        <div className="offline-banner" style={{ background: 'var(--indigo-dim)', borderColor: 'var(--indigo-border)', color: 'var(--indigo)', position: 'relative', zIndex: 1 }}>
+          New version available — close all app tabs and reopen to update
+        </div>
+      )}
 
       {/* Page content */}
       <main style={{ position: 'relative', zIndex: 1 }}>
