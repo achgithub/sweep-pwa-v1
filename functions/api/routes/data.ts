@@ -686,7 +686,13 @@ data.get('/competitions/:id', async (c) => {
     ORDER BY pp.sort_order
   `).bind(compId).all()
 
-  return c.json({ competition: comp, prizePositions: prizePositions.results, entries: entries.results, results: results.results })
+  const poolComp = comp as { poolId: number; poolType: string }
+  const optionsQuery = poolComp.poolType === 'racing'
+    ? 'SELECT id, name FROM runners WHERE pool_id = ? ORDER BY name'
+    : 'SELECT id, name FROM teams WHERE pool_id = ? ORDER BY name'
+  const poolOptions = await c.env.DB.prepare(optionsQuery).bind(poolComp.poolId).all<{ id: number; name: string }>()
+
+  return c.json({ competition: comp, prizePositions: prizePositions.results, entries: entries.results, results: results.results, poolOptions: poolOptions.results })
 })
 
 // PATCH /competitions/:id
@@ -798,13 +804,14 @@ data.delete('/players/:id', requireRole('manager', 'admin'), async (c) => {
 
 // POST /competitions/:id/entries — add an unspun entry for a player
 data.post('/competitions/:id/entries', requireRole('manager', 'admin'), async (c) => {
-  const userId = c.get('userId')
+  const userId   = c.get('userId')
+  const userRole = c.get('userRole')
   const compId = Number(c.req.param('id'))
   const body   = await c.req.json<{ playerId: number }>()
 
   const comp = await c.env.DB.prepare('SELECT manager_id FROM competitions WHERE id = ?').bind(compId).first<{ manager_id: number }>()
   if (!comp) return c.json({ error: 'Not found' }, 404)
-  if (comp.manager_id !== userId) return c.json({ error: 'Forbidden' }, 403)
+  if (userRole !== 'admin' && comp.manager_id !== userId) return c.json({ error: 'Forbidden' }, 403)
 
   const entry = await c.env.DB.prepare(`
     INSERT INTO entries (competition_id, player_id) VALUES (?, ?)
@@ -816,7 +823,8 @@ data.post('/competitions/:id/entries', requireRole('manager', 'admin'), async (c
 
 // POST /competitions/:id/entries/:entryId/spin — assign random unassigned runner/team
 data.post('/competitions/:id/entries/:entryId/spin', requireRole('manager', 'admin'), async (c) => {
-  const userId  = c.get('userId')
+  const userId   = c.get('userId')
+  const userRole = c.get('userRole')
   const compId  = Number(c.req.param('id'))
   const entryId = Number(c.req.param('entryId'))
 
@@ -827,7 +835,7 @@ data.post('/competitions/:id/entries/:entryId/spin', requireRole('manager', 'adm
   `).bind(compId).first<{ manager_id: number; pool_id: number; poolType: string }>()
 
   if (!comp) return c.json({ error: 'Not found' }, 404)
-  if (comp.manager_id !== userId) return c.json({ error: 'Forbidden' }, 403)
+  if (userRole !== 'admin' && comp.manager_id !== userId) return c.json({ error: 'Forbidden' }, 403)
 
   const entry = await c.env.DB.prepare('SELECT id, spun_at FROM entries WHERE id = ? AND competition_id = ?').bind(entryId, compId).first<{ spun_at: string | null }>()
   if (!entry) return c.json({ error: 'Entry not found' }, 404)
@@ -879,12 +887,13 @@ data.post('/competitions/:id/entries/:entryId/spin', requireRole('manager', 'adm
 
 // DELETE /competitions/:id/entries/:entryId — remove an unspun entry
 data.delete('/competitions/:id/entries/:entryId', requireRole('manager', 'admin'), async (c) => {
-  const userId  = c.get('userId')
+  const userId   = c.get('userId')
+  const userRole = c.get('userRole')
   const compId  = Number(c.req.param('id'))
   const entryId = Number(c.req.param('entryId'))
 
   const comp = await c.env.DB.prepare('SELECT manager_id FROM competitions WHERE id = ?').bind(compId).first<{ manager_id: number }>()
-  if (!comp || comp.manager_id !== userId) return c.json({ error: 'Forbidden' }, 403)
+  if (!comp || (userRole !== 'admin' && comp.manager_id !== userId)) return c.json({ error: 'Forbidden' }, 403)
 
   const entry = await c.env.DB.prepare('SELECT spun_at FROM entries WHERE id = ? AND competition_id = ?').bind(entryId, compId).first<{ spun_at: string | null }>()
   if (!entry) return c.json({ error: 'Not found' }, 404)
@@ -898,11 +907,12 @@ data.delete('/competitions/:id/entries/:entryId', requireRole('manager', 'admin'
 
 // PUT /competitions/:id/results — set prize position winners
 data.put('/competitions/:id/results', requireRole('manager', 'admin'), async (c) => {
-  const userId = c.get('userId')
+  const userId   = c.get('userId')
+  const userRole = c.get('userRole')
   const compId = Number(c.req.param('id'))
 
   const comp = await c.env.DB.prepare('SELECT manager_id FROM competitions WHERE id = ?').bind(compId).first<{ manager_id: number }>()
-  if (!comp || comp.manager_id !== userId) return c.json({ error: 'Forbidden' }, 403)
+  if (!comp || (userRole !== 'admin' && comp.manager_id !== userId)) return c.json({ error: 'Forbidden' }, 403)
 
   const body = await c.req.json<{ results: { prizePositionId: number; runnerId?: number; teamId?: number }[] }>()
 

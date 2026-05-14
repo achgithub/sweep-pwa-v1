@@ -207,4 +207,5 @@ export interface CompetitionDetail {
   prizePositions: PrizePosition[]
   entries: Entry[]
   results: CompetitionResult[]
+  poolOptions: { id: number; name: string }[]
 }
