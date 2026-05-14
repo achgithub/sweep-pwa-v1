@@ -69,7 +69,7 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
         const progress = i / seq.length
         // Flat 35ms until 75%, then cubic drop over the final 25%
         const p = Math.max(0, (progress - 0.75) / 0.25)
-        timerRef.current = setTimeout(tick, 35 + Math.pow(p, 3) * 1600)
+        timerRef.current = setTimeout(tick, 35 + Math.pow(p, 3) * 500)
       }
       tick()
 
