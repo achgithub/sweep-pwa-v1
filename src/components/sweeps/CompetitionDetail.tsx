@@ -322,7 +322,7 @@ function EntriesTab({ detail, competitionId, onUpdate }: {
       await api.delete(`/competitions/${competitionId}/entries/${entryId}`)
       onUpdate()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Cannot remove — entry already drawn')
+      setError(err instanceof Error ? err.message : 'Failed to remove entry')
       setDeletingId(null)
     }
   }
@@ -372,17 +372,15 @@ function EntriesTab({ detail, competitionId, onUpdate }: {
                   </div>
                 )}
               </div>
-              {!e.spunAt && (
-                <button
-                  className="btn-icon"
-                  onClick={() => deleteEntry(e.id)}
-                  disabled={deletingId === e.id}
-                >
-                  {deletingId === e.id
-                    ? <span className="spinner" style={{ width: 12, height: 12 }} />
-                    : <i className="ti ti-x" />}
-                </button>
-              )}
+              <button
+                className="btn-icon"
+                onClick={() => deleteEntry(e.id)}
+                disabled={deletingId === e.id}
+              >
+                {deletingId === e.id
+                  ? <span className="spinner" style={{ width: 12, height: 12 }} />
+                  : <i className="ti ti-x" />}
+              </button>
             </div>
           ))}
         </div>

@@ -895,9 +895,8 @@ data.delete('/competitions/:id/entries/:entryId', requireRole('manager', 'admin'
   const comp = await c.env.DB.prepare('SELECT manager_id FROM competitions WHERE id = ?').bind(compId).first<{ manager_id: number }>()
   if (!comp || (userRole !== 'admin' && comp.manager_id !== userId)) return c.json({ error: 'Forbidden' }, 403)
 
-  const entry = await c.env.DB.prepare('SELECT spun_at FROM entries WHERE id = ? AND competition_id = ?').bind(entryId, compId).first<{ spun_at: string | null }>()
+  const entry = await c.env.DB.prepare('SELECT id FROM entries WHERE id = ? AND competition_id = ?').bind(entryId, compId).first()
   if (!entry) return c.json({ error: 'Not found' }, 404)
-  if (entry.spun_at) return c.json({ error: 'Cannot remove a spun entry' }, 409)
 
   await c.env.DB.prepare('DELETE FROM entries WHERE id = ?').bind(entryId).run()
   return c.body(null, 204)
