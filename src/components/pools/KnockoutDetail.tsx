@@ -9,9 +9,11 @@ type SubTab = 'teams' | 'groups' | 'bracket'
 
 function fmtDate(iso: string | undefined) {
   if (!iso) return null
-  return new Date(iso).toLocaleString(undefined, {
-    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  })
+  const d = new Date(iso)
+  const day  = d.getDate()
+  const mon  = d.toLocaleString('en-GB', { month: 'short' })
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  return `${day} ${mon} ${time}`
 }
 
 function DateBadge({ scheduledAt, onEdit }: { scheduledAt?: string; onEdit?: () => void }) {
@@ -435,13 +437,17 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
           {matches.map(match => (
             <div key={match.id} className="card" style={{ gap: 6, flexDirection: 'column', alignItems: 'stretch' }}>
-              {/* Teams + actions on one row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Single row: date | home | vs | away | score | × */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {editingDateId !== match.id && (
+                  <DateBadge scheduledAt={match.scheduledAt}
+                    onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
+                )}
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13, textAlign: 'right' }}>
                   {match.homeTeamName}
                 </span>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)', minWidth: 40, textAlign: 'center' }}>
-                  {match.status === 'complete' ? `${match.homeScore} – ${match.awayScore}` : 'vs'}
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)', minWidth: 32, textAlign: 'center' }}>
+                  {match.status === 'complete' ? `${match.homeScore}–${match.awayScore}` : 'vs'}
                 </span>
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>
                   {match.awayTeamName}
@@ -456,15 +462,12 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
                   <i className="ti ti-x" />
                 </button>
               </div>
-              {/* Date badge row */}
-              {editingDateId === match.id ? (
+              {editingDateId === match.id && (
                 <DateEditor
                   value={match.scheduledAt}
                   onSave={v => { updateMatchDate(match.id, v); setEditingDateId(null) }}
                   onCancel={() => setEditingDateId(null)}
                 />
-              ) : (
-                <DateBadge scheduledAt={match.scheduledAt} onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
               )}
               {scoringMatch === match.id && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -669,8 +672,13 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
           const availableAway = teams.filter(t => t.id !== match.homeTeamId && !usedInStage.includes(t.id))
 
           return (
-          <div key={match.id} className="card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div key={match.id} className="card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Date badge — before home team */}
+              {editingDateId !== match.id && (
+                <DateBadge scheduledAt={match.scheduledAt}
+                  onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
+              )}
               {/* Home team */}
               {stage.isFirstStage && !match.homeTeamId ? (
                 <select style={{ flex: 1, fontSize: 13 }}
