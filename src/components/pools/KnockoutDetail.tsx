@@ -456,12 +456,14 @@ function GroupSection({ poolId, group, members, matches, availableTeams, onRefre
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>
                   {match.awayTeamName}
                 </span>
-                {match.status !== 'complete' && (
-                  <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }}
-                    onClick={() => { setScoringMatch(match.id); setHomeScore(''); setAwayScore('') }}>
-                    Score
-                  </button>
-                )}
+                <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }}
+                  onClick={() => {
+                    setScoringMatch(match.id)
+                    setHomeScore(match.homeScore != null ? String(match.homeScore) : '')
+                    setAwayScore(match.awayScore != null ? String(match.awayScore) : '')
+                  }}>
+                  {match.status === 'complete' ? <><i className="ti ti-pencil" /> Score</> : 'Score'}
+                </button>
                 <button className="btn-icon" style={{ flexShrink: 0 }} onClick={() => deleteMatch(match.id)}>
                   <i className="ti ti-x" />
                 </button>
@@ -735,10 +737,14 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
               )}
 
               {/* Actions */}
-              {match.homeTeamId && match.awayTeamId && match.status !== 'complete' && (
+              {match.homeTeamId && match.awayTeamId && (
                 <button className="btn btn-secondary btn-sm"
-                  onClick={() => { setScoringId(match.id); setHomeScore(''); setAwayScore('') }}>
-                  Score
+                  onClick={() => {
+                    setScoringId(match.id)
+                    setHomeScore(match.homeScore != null ? String(match.homeScore) : '')
+                    setAwayScore(match.awayScore != null ? String(match.awayScore) : '')
+                  }}>
+                  {match.status === 'complete' ? <><i className="ti ti-pencil" /> Score</> : 'Score'}
                 </button>
               )}
               {match.status === 'complete' && (
