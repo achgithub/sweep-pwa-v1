@@ -555,16 +555,23 @@ data.patch('/pools/:id/knockout-matches/:matchId', async (c) => {
 
   if (!match) return c.json({ error: 'Not found' }, 404)
 
-  // Setting teams (bracket setup)
-  if (body.homeTeamId !== undefined || body.awayTeamId !== undefined || body.scheduledAt !== undefined) {
-    await c.env.DB.prepare(`
-      UPDATE knockout_matches
-      SET home_team_id = COALESCE(?, home_team_id),
-          away_team_id = COALESCE(?, away_team_id),
-          scheduled_at = COALESCE(?, scheduled_at),
-          status = CASE WHEN home_team_id IS NOT NULL AND away_team_id IS NOT NULL THEN 'scheduled' ELSE status END
-      WHERE id = ?
-    `).bind(body.homeTeamId ?? null, body.awayTeamId ?? null, body.scheduledAt ?? null, matchId).run()
+  // Setting teams (bracket setup) — supports null to clear a team
+  const teamUpdate = 'homeTeamId' in body || 'awayTeamId' in body
+  if (teamUpdate || body.scheduledAt !== undefined) {
+    const stmts = []
+    if ('homeTeamId' in body)
+      stmts.push(c.env.DB.prepare('UPDATE knockout_matches SET home_team_id = ? WHERE id = ?').bind(body.homeTeamId ?? null, matchId))
+    if ('awayTeamId' in body)
+      stmts.push(c.env.DB.prepare('UPDATE knockout_matches SET away_team_id = ? WHERE id = ?').bind(body.awayTeamId ?? null, matchId))
+    if (body.scheduledAt !== undefined)
+      stmts.push(c.env.DB.prepare('UPDATE knockout_matches SET scheduled_at = ? WHERE id = ?').bind(body.scheduledAt, matchId))
+    if (stmts.length) await c.env.DB.batch(stmts)
+    if (teamUpdate)
+      await c.env.DB.prepare(`
+        UPDATE knockout_matches
+        SET status = CASE WHEN home_team_id IS NOT NULL AND away_team_id IS NOT NULL THEN 'scheduled' ELSE 'pending' END
+        WHERE id = ?
+      `).bind(matchId).run()
   }
 
   // Entering score — determines winner and auto-advances to next stage

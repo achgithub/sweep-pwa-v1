@@ -621,7 +621,7 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
   const [awayScore, setAwayScore] = useState('')
   const [error, setError] = useState('')
 
-  async function setTeam(matchId: number, side: 'home' | 'away', teamId: number) {
+  async function setTeam(matchId: number, side: 'home' | 'away', teamId: number | null) {
     try {
       await api.patch(`/pools/${poolId}/knockout-matches/${matchId}`, {
         [side === 'home' ? 'homeTeamId' : 'awayTeamId']: teamId,
@@ -682,12 +682,22 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
                   onEdit={match.status !== 'complete' ? () => setEditingDateId(match.id) : undefined} />
               )}
               {/* Home team */}
-              {stage.isFirstStage && !match.homeTeamId ? (
-                <select style={{ flex: 1, fontSize: 13 }}
-                  onChange={e => e.target.value && setTeam(match.id, 'home', Number(e.target.value))}>
-                  <option value="">Select home team</option>
-                  {availableHome.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+              {stage.isFirstStage && match.status !== 'complete' ? (
+                match.homeTeamId ? (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>{match.homeTeamName}</span>
+                    <button className="btn-icon" style={{ padding: '2px 4px', color: 'var(--text-tertiary)' }}
+                      onClick={() => setTeam(match.id, 'home', null)} title="Clear">
+                      <i className="ti ti-x" style={{ fontSize: 12 }} />
+                    </button>
+                  </div>
+                ) : (
+                  <select style={{ flex: 1, fontSize: 13 }}
+                    onChange={e => e.target.value && setTeam(match.id, 'home', Number(e.target.value))}>
+                    <option value="">Select home team</option>
+                    {availableHome.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )
               ) : (
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13, textAlign: 'right' }}>
                   {match.homeTeamName ?? <span style={{ color: 'var(--text-tertiary)' }}>TBD</span>}
@@ -702,12 +712,22 @@ function StageSection({ poolId, stage, matches, teams, onRefresh }: {
               </span>
 
               {/* Away team */}
-              {stage.isFirstStage && !match.awayTeamId ? (
-                <select style={{ flex: 1, fontSize: 13 }}
-                  onChange={e => e.target.value && setTeam(match.id, 'away', Number(e.target.value))}>
-                  <option value="">Select away team</option>
-                  {availableAway.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+              {stage.isFirstStage && match.status !== 'complete' ? (
+                match.awayTeamId ? (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>{match.awayTeamName}</span>
+                    <button className="btn-icon" style={{ padding: '2px 4px', color: 'var(--text-tertiary)' }}
+                      onClick={() => setTeam(match.id, 'away', null)} title="Clear">
+                      <i className="ti ti-x" style={{ fontSize: 12 }} />
+                    </button>
+                  </div>
+                ) : (
+                  <select style={{ flex: 1, fontSize: 13 }}
+                    onChange={e => e.target.value && setTeam(match.id, 'away', Number(e.target.value))}>
+                    <option value="">Select away team</option>
+                    {availableAway.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )
               ) : (
                 <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>
                   {match.awayTeamName ?? <span style={{ color: 'var(--text-tertiary)' }}>TBD</span>}
