@@ -289,24 +289,30 @@ function EntriesTab({ detail, competitionId, onUpdate }: {
   const { entries } = detail
   const isRacing = detail.competition.poolType === 'racing'
   const [players, setPlayers] = useState<Player[]>([])
-  const [playerId, setPlayerId] = useState<number | ''>('')
+  const [newName, setNewName] = useState('')
   const [adding, setAdding] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api.get<Player[]>('/players').then(ps => {
-      setPlayers(ps)
-      if (ps.length) setPlayerId(ps[0].id)
-    }).catch(() => {})
+    api.get<Player[]>('/players').then(setPlayers).catch(() => {})
   }, [])
 
-  async function addEntry() {
-    if (!playerId) return
+  async function addEntry(e: React.FormEvent) {
+    e.preventDefault()
+    const name = newName.trim()
+    if (!name) return
     setAdding(true)
     setError('')
     try {
-      await api.post(`/competitions/${competitionId}/entries`, { playerId })
+      // Find existing player (case-insensitive) or create one on the fly
+      let player = players.find(p => p.name.toLowerCase() === name.toLowerCase())
+      if (!player) {
+        player = await api.post<Player>('/players', { name })
+        setPlayers(prev => [...prev, player!])
+      }
+      await api.post(`/competitions/${competitionId}/entries`, { playerId: player.id })
+      setNewName('')
       onUpdate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add')
@@ -331,29 +337,28 @@ function EntriesTab({ detail, competitionId, onUpdate }: {
     <div style={{ padding: '0 18px' }}>
       {error && <div className="alert alert-error">{error}</div>}
 
-      {players.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <select
-            style={{ flex: 1 }} value={playerId}
-            onChange={e => setPlayerId(Number(e.target.value))}
-          >
-            {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={addEntry} disabled={adding || !playerId}
-          >
-            {adding
-              ? <span className="spinner" style={{ width: 12, height: 12 }} />
-              : '+ Add'}
-          </button>
-        </div>
-      )}
+      <form onSubmit={addEntry} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <input
+          type="text" style={{ flex: 1 }}
+          value={newName} onChange={e => setNewName(e.target.value)}
+          placeholder="Player name…"
+          list="player-suggestions"
+        />
+        {/* Datalist for quick-pick from pool without requiring a dropdown */}
+        <datalist id="player-suggestions">
+          {players.map(p => <option key={p.id} value={p.name} />)}
+        </datalist>
+        <button className="btn btn-primary btn-sm" type="submit" disabled={adding || !newName.trim()}>
+          {adding
+            ? <span className="spinner" style={{ width: 12, height: 12 }} />
+            : '+ Add'}
+        </button>
+      </form>
 
       {entries.length === 0 ? (
         <div className="empty-state">
           <i className="ti ti-users" style={{ fontSize: 28, display: 'block', marginBottom: 10 }} />
-          <div>No entries yet — add players above</div>
+          <div>No entries yet — type a name above to add</div>
         </div>
       ) : (
         <div className="card" style={{ padding: 0 }}>

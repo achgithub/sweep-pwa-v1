@@ -616,13 +616,12 @@ data.get('/competitions', async (c) => {
 
 data.post('/competitions', requireRole('manager', 'admin'), async (c) => {
   const userId = c.get('userId')
-  const body = await c.req.json<{ poolId: number; name: string; prizePositions: string[] }>()
+  const body = await c.req.json<{ poolId: number; name: string; prizePositions: string[]; playerIds?: number[] }>()
 
   if (!body.name?.trim()) return c.json({ error: 'Name required' }, 400)
   if (!body.poolId) return c.json({ error: 'poolId required' }, 400)
   if (!body.prizePositions?.length) return c.json({ error: 'At least one prize position required' }, 400)
 
-  // Verify pool is accessible
   const pool = await c.env.DB.prepare("SELECT id, owner_id FROM pools WHERE id = ?").bind(body.poolId).first<{ owner_id: number }>()
   if (!pool) return c.json({ error: 'Pool not found' }, 404)
 
@@ -631,9 +630,13 @@ data.post('/competitions', requireRole('manager', 'admin'), async (c) => {
     VALUES (?, ?, ?) RETURNING id
   `).bind(userId, body.poolId, body.name.trim()).first<{ id: number }>()
 
-  for (let i = 0; i < body.prizePositions.length; i++) {
-    await c.env.DB.prepare('INSERT INTO prize_positions (competition_id, label, sort_order) VALUES (?, ?, ?)').bind(comp!.id, body.prizePositions[i], i).run()
-  }
+  const prizeStmts = body.prizePositions.map((label, i) =>
+    c.env.DB.prepare('INSERT INTO prize_positions (competition_id, label, sort_order) VALUES (?, ?, ?)').bind(comp!.id, label, i)
+  )
+  const entryStmts = (body.playerIds ?? []).map(pid =>
+    c.env.DB.prepare('INSERT INTO entries (competition_id, player_id) VALUES (?, ?)').bind(comp!.id, pid)
+  )
+  await c.env.DB.batch([...prizeStmts, ...entryStmts])
 
   return c.json({ id: comp!.id }, 201)
 })

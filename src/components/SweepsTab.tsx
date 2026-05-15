@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import type { Competition, Pool } from '../types'
+import type { Competition, Pool, Player } from '../types'
 import CompetitionDetail from './sweeps/CompetitionDetail'
 
 export default function SweepsTab() {
@@ -101,22 +101,37 @@ function StatusBadge({ status }: { status: string }) {
 
 function CreateForm({ onBack, onCreate }: { onBack: () => void; onCreate: (id: number) => void }) {
   const [pools, setPools] = useState<Pool[]>([])
-  const [loadingPools, setLoadingPools] = useState(true)
+  const [players, setPlayers] = useState<Player[]>([])
+  const [loading, setLoading] = useState(true)
   const [poolId, setPoolId] = useState<number | ''>('')
   const [name, setName] = useState('')
   const [positions, setPositions] = useState(['1st', '2nd', '3rd'])
+  const [selected, setSelected] = useState<Set<number>>(new Set())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api.get<Pool[]>('/pools')
-      .then(ps => {
-        setPools(ps)
-        if (ps.length) setPoolId(ps[0].id)
-      })
-      .catch(() => setError('Failed to load pools'))
-      .finally(() => setLoadingPools(false))
+    Promise.all([
+      api.get<Pool[]>('/pools'),
+      api.get<Player[]>('/players'),
+    ]).then(([ps, pls]) => {
+      setPools(ps)
+      if (ps.length) setPoolId(ps[0].id)
+      setPlayers(pls)
+    }).catch(() => setError('Failed to load')).finally(() => setLoading(false))
   }, [])
+
+  function togglePlayer(id: number) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    setSelected(selected.size === players.length ? new Set() : new Set(players.map(p => p.id)))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -130,6 +145,7 @@ function CreateForm({ onBack, onCreate }: { onBack: () => void; onCreate: (id: n
         poolId,
         name: name.trim(),
         prizePositions: validPositions,
+        playerIds: [...selected],
       })
       onCreate(res.id)
     } catch (err) {
@@ -137,10 +153,6 @@ function CreateForm({ onBack, onCreate }: { onBack: () => void; onCreate: (id: n
     } finally {
       setSaving(false)
     }
-  }
-
-  function updatePosition(i: number, val: string) {
-    setPositions(positions.map((p, j) => j === i ? val : p))
   }
 
   return (
@@ -157,7 +169,7 @@ function CreateForm({ onBack, onCreate }: { onBack: () => void; onCreate: (id: n
       <form onSubmit={handleSubmit} style={{ padding: '0 18px' }}>
         <div style={{ marginBottom: 14 }}>
           <label>Pool</label>
-          {loadingPools ? (
+          {loading ? (
             <div style={{ marginTop: 8 }}><span className="spinner" style={{ width: 14, height: 14 }} /></div>
           ) : (
             <select value={poolId} onChange={e => setPoolId(Number(e.target.value))} required>
@@ -185,32 +197,69 @@ function CreateForm({ onBack, onCreate }: { onBack: () => void; onCreate: (id: n
             <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <input
                 type="text" style={{ flex: 1 }} value={p}
-                onChange={e => updatePosition(i, e.target.value)}
+                onChange={e => setPositions(positions.map((x, j) => j === i ? e.target.value : x))}
                 placeholder={`Position ${i + 1}`}
               />
               {positions.length > 1 && (
-                <button
-                  type="button" className="btn-icon"
-                  onClick={() => setPositions(positions.filter((_, j) => j !== i))}
-                >
+                <button type="button" className="btn-icon"
+                  onClick={() => setPositions(positions.filter((_, j) => j !== i))}>
                   <i className="ti ti-x" />
                 </button>
               )}
             </div>
           ))}
-          <button
-            type="button" className="btn btn-ghost btn-sm"
-            onClick={() => setPositions([...positions, ''])}
-          >
+          <button type="button" className="btn btn-ghost btn-sm"
+            onClick={() => setPositions([...positions, ''])}>
             + Add position
           </button>
         </div>
 
-        <button
-          type="submit" className="btn btn-primary btn-full"
-          disabled={saving || loadingPools || !poolId}
-        >
-          {saving ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Create sweep'}
+        {/* Player selection */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <label style={{ display: 'block' }}>
+              Players{selected.size > 0 ? ` (${selected.size} selected)` : ''}
+            </label>
+            {players.length > 0 && (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={toggleAll}>
+                {selected.size === players.length ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+          </div>
+          {loading ? null : players.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              No players in pool yet — you can add them after creating.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {players.map(p => {
+                const on = selected.has(p.id)
+                return (
+                  <button
+                    key={p.id} type="button" onClick={() => togglePlayer(p.id)}
+                    style={{
+                      padding: '7px 14px', border: '1px solid', borderRadius: 'var(--radius-sm)',
+                      borderColor: on ? 'var(--indigo)' : 'var(--border-default)',
+                      background: on ? 'var(--indigo-dim)' : 'transparent',
+                      color: on ? 'var(--indigo)' : 'var(--text-primary)',
+                      fontSize: 13, fontWeight: on ? 600 : 400,
+                      fontFamily: 'inherit', cursor: 'pointer',
+                      transition: 'all 0.12s',
+                    }}
+                  >
+                    {p.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <button type="submit" className="btn btn-primary btn-full"
+          disabled={saving || loading || !poolId}>
+          {saving
+            ? <span className="spinner" style={{ width: 14, height: 14 }} />
+            : `Create sweep${selected.size ? ` with ${selected.size} player${selected.size > 1 ? 's' : ''}` : ''}`}
         </button>
       </form>
     </div>
