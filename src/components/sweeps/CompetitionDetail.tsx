@@ -404,6 +404,15 @@ function DrawTab({ detail, onSpin }: {
   const isRacing = competition.poolType === 'racing'
   const unspun = entries.filter(e => !e.spunAt)
   const spun = entries.filter(e => e.spunAt)
+  const [filter, setFilter] = useState('')
+
+  const visibleSpun = filter.trim()
+    ? spun.filter(e => {
+        const q = filter.toLowerCase()
+        const team = (isRacing ? e.assignedRunnerName : e.assignedTeamName) ?? ''
+        return e.playerName.toLowerCase().includes(q) || team.toLowerCase().includes(q)
+      })
+    : spun
 
   if (entries.length === 0) {
     return (
@@ -464,19 +473,34 @@ function DrawTab({ detail, onSpin }: {
 
       {spun.length > 0 && (
         <>
-          <div className="section-label" style={{ marginBottom: 8 }}>
-            {unspun.length === 0 ? 'Results' : 'Already drawn'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div className="section-label" style={{ marginBottom: 0 }}>
+              {unspun.length === 0 ? 'Results' : 'Already drawn'}
+            </div>
           </div>
-          <div className="card" style={{ padding: 0 }}>
-            {spun.map(e => (
-              <div key={e.id} className="list-item">
-                <span style={{ fontWeight: 600 }}>{e.playerName}</span>
-                <span style={{ fontSize: 13, color: 'var(--emerald)', fontWeight: 600 }}>
-                  {isRacing ? e.assignedRunnerName : e.assignedTeamName}
-                </span>
-              </div>
-            ))}
-          </div>
+          <input
+            type="search"
+            placeholder="Search player or team…"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            style={{ marginBottom: 8 }}
+          />
+          {visibleSpun.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', padding: '10px 0' }}>
+              No results for "{filter}"
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 0 }}>
+              {visibleSpun.map(e => (
+                <div key={e.id} className="list-item">
+                  <span style={{ fontWeight: 600 }}>{e.playerName}</span>
+                  <span style={{ fontSize: 13, color: 'var(--emerald)', fontWeight: 600 }}>
+                    {isRacing ? e.assignedRunnerName : e.assignedTeamName}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
