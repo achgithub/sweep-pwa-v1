@@ -33,6 +33,7 @@ function useUpdateAvailable() {
 function Shell() {
   const { user, isAdmin, logout } = useAuth()
   const [tab, setTab] = useState<Tab>('sweeps')
+  const [showProfile, setShowProfile] = useState(false)
   const updateAvailable = useUpdateAvailable()
 
   const managerNav: { id: Tab; label: string; icon: string }[] = [
@@ -61,18 +62,19 @@ function Shell() {
         <div className="app-logo">
           <span style={{ color: 'var(--indigo)' }}>Sweep</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
+        <button
+          onClick={() => setShowProfile(true)}
+          style={{
             width: 30, height: 30, borderRadius: '50%',
             background: 'rgba(255,255,255,0.09)',
             border: '1px solid rgba(255,255,255,0.13)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: 'var(--text-primary)'
-          }}>
-            {user?.name.slice(0, 2).toUpperCase()}
-          </div>
-          <button className="ghost-pill" onClick={logout}>Sign out</button>
-        </div>
+            fontSize: 11, fontWeight: 700, color: 'var(--text-primary)',
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          {user?.name.slice(0, 2).toUpperCase()}
+        </button>
       </header>
 
       {/* Update banner */}
@@ -104,6 +106,89 @@ function Shell() {
           </button>
         ))}
       </nav>
+
+      {showProfile && user && (
+        <ProfileSheet
+          user={user}
+          onClose={() => setShowProfile(false)}
+          onSignOut={logout}
+        />
+      )}
+    </div>
+  )
+}
+
+function ProfileSheet({ user, onClose, onSignOut }: {
+  user: { name: string; role: string }
+  onClose: () => void
+  onSignOut: () => void
+}) {
+  const [confirm, setConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState('')
+
+  async function deleteAccount() {
+    setDeleting(true)
+    setError('')
+    try {
+      await api.delete('/auth/me')
+      onSignOut()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed')
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end' }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--bg-base)', borderTop: '1px solid var(--border-default)',
+          borderRadius: '20px 20px 0 0', padding: '24px 24px calc(24px + env(safe-area-inset-bottom))',
+          width: '100%', maxWidth: 600, margin: '0 auto',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* User info */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 17 }}>{user.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2, textTransform: 'capitalize' }}>
+            {user.role}
+          </div>
+        </div>
+
+        {error && <div className="alert alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+
+        <button className="btn btn-ghost btn-full" style={{ marginBottom: 8 }} onClick={onSignOut}>
+          <i className="ti ti-logout" /> Sign out
+        </button>
+
+        {user.role === 'manager' && !confirm && (
+          <button className="btn btn-danger btn-full" onClick={() => setConfirm(true)}>
+            <i className="ti ti-trash" /> Delete my account
+          </button>
+        )}
+
+        {user.role === 'manager' && confirm && (
+          <div style={{ marginTop: 4 }}>
+            <div style={{ fontSize: 13, color: 'var(--red)', marginBottom: 12, lineHeight: 1.5 }}>
+              This permanently deletes all your sweeps, pools and players. There is no undo.
+            </div>
+            <button className="btn btn-danger btn-full" style={{ marginBottom: 8 }}
+              onClick={deleteAccount} disabled={deleting}>
+              {deleting
+                ? <span className="spinner" style={{ width: 14, height: 14 }} />
+                : 'Yes, delete everything'}
+            </button>
+            <button className="btn btn-ghost btn-full" onClick={() => setConfirm(false)} disabled={deleting}>
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

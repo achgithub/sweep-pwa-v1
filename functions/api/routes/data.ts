@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { requireRole } from '../middleware/auth'
+import { deleteUserAndData } from '../lib/deleteUser'
 import type { HonoEnv } from '../lib/types'
 
 const data = new Hono<HonoEnv>()
@@ -945,6 +946,15 @@ data.get('/managers', requireRole('admin'), async (c) => {
     FROM users WHERE role = 'manager' ORDER BY name
   `).all()
   return c.json(rows.results)
+})
+
+data.delete('/managers/:id', requireRole('admin'), async (c) => {
+  const managerId = Number(c.req.param('id'))
+  const manager = await c.env.DB.prepare(`SELECT id, role FROM users WHERE id = ?`).bind(managerId).first<{ role: string }>()
+  if (!manager) return c.json({ error: 'Not found' }, 404)
+  if (manager.role !== 'manager') return c.json({ error: 'Not a manager account' }, 400)
+  await deleteUserAndData(c.env.DB, managerId)
+  return c.body(null, 204)
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────

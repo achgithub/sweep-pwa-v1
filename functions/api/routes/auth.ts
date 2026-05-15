@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { signJWT } from '../lib/jwt'
 import { hashPasscode, randomHex } from '../lib/crypto'
 import { authMiddleware } from '../middleware/auth'
+import { deleteUserAndData } from '../lib/deleteUser'
 import type { HonoEnv } from '../lib/types'
 
 const auth = new Hono<HonoEnv>()
@@ -119,6 +120,13 @@ auth.post('/reset-passcode', authMiddleware, async (c) => {
 
   if (result.meta.changes === 0) return c.json({ error: 'User not found' }, 404)
   return c.json({ ok: true })
+})
+
+// DELETE /auth/me — manager deletes their own account and all data
+auth.delete('/me', authMiddleware, async (c) => {
+  if (c.get('userRole') !== 'manager') return c.json({ error: 'Only managers can delete their own account' }, 403)
+  await deleteUserAndData(c.env.DB, c.get('userId'))
+  return c.body(null, 204)
 })
 
 // GET /auth/me
