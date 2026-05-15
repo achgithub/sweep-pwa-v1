@@ -14,44 +14,61 @@ interface Props {
 const CONFETTI_COLORS = ['#818cf8', '#34d399', '#fbbf24', '#f87171', '#ffffff', '#a78bfa', '#6ee7b7']
 
 export default function SpinScreen({ competitionId, entry, poolType, poolOptions, onComplete, onCancel }: Props) {
-  const [phase, setPhase] = useState<'ready' | 'spinning' | 'result'>('ready')
+  const [phase, setPhase] = useState<'ready' | 'here-we-go' | 'spinning' | 'result'>('ready')
   const [displayName, setDisplayName] = useState(poolOptions[0]?.name ?? '…')
   const [revealed, setRevealed] = useState(false)
   const [error, setError] = useState('')
+
+  // Pre-fetched result stored here once the API resolves
+  const prefetchRef = useRef<Promise<{ winner: string; updatedEntry: Entry }> | null>(null)
   const resultRef = useRef<Entry | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mountedRef = useRef(true)
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+  // Fire the API call immediately on mount so the result is ready before SPIN is tapped
+  useEffect(() => {
+    prefetchRef.current = api
+      .post<{
+        assignedRunner?: { id: number; name: string }
+        assignedTeam?: { id: number; name: string }
+      }>(`/competitions/${competitionId}/entries/${entry.id}/spin`, {})
+      .then(res => {
+        const winner = res.assignedRunner?.name ?? res.assignedTeam?.name ?? '?'
+        const updatedEntry: Entry = {
+          ...entry,
+          spunAt: new Date().toISOString(),
+          ...(res.assignedRunner
+            ? { assignedRunnerId: res.assignedRunner.id, assignedRunnerName: res.assignedRunner.name }
+            : {}),
+          ...(res.assignedTeam
+            ? { assignedTeamId: res.assignedTeam.id, assignedTeamName: res.assignedTeam.name }
+            : {}),
+        }
+        return { winner, updatedEntry }
+      })
+
+    return () => {
+      mountedRef.current = false
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
-    if (phase === 'result') setTimeout(() => setRevealed(true), 60)
+    if (phase === 'result') setTimeout(() => { if (mountedRef.current) setRevealed(true) }, 60)
   }, [phase])
 
   async function handleSpin() {
     if (phase !== 'ready') return
-    setPhase('spinning')
+    setPhase('here-we-go')
     setError('')
     setRevealed(false)
 
     try {
-      const res = await api.post<{
-        assignedRunner?: { id: number; name: string }
-        assignedTeam?: { id: number; name: string }
-      }>(`/competitions/${competitionId}/entries/${entry.id}/spin`, {})
+      const { winner, updatedEntry } = await prefetchRef.current!
+      if (!mountedRef.current) return
 
-      const winner = res.assignedRunner?.name ?? res.assignedTeam?.name ?? '?'
-      resultRef.current = {
-        ...entry,
-        spunAt: new Date().toISOString(),
-        ...(res.assignedRunner
-          ? { assignedRunnerId: res.assignedRunner.id, assignedRunnerName: res.assignedRunner.name }
-          : {}),
-        ...(res.assignedTeam
-          ? { assignedTeamId: res.assignedTeam.id, assignedTeamName: res.assignedTeam.name }
-          : {}),
-      }
+      resultRef.current = updatedEntry
 
-      // Exclude the winner from the cycling names so it only appears at the reveal
       const cycleNames = poolOptions.map(o => o.name).filter(n => n !== winner)
       const PRE = 48
       const seq: string[] = []
@@ -61,19 +78,22 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
       seq.splice(PRE)
       seq.push(winner)
 
+      setPhase('spinning')
+
       let i = 0
       const tick = () => {
+        if (!mountedRef.current) return
         setDisplayName(seq[i])
         i++
         if (i >= seq.length) { setPhase('result'); return }
         const progress = i / seq.length
-        // Flat 35ms until 75%, then cubic drop over the final 25%
         const p = Math.max(0, (progress - 0.75) / 0.25)
         timerRef.current = setTimeout(tick, 35 + Math.pow(p, 3) * 500)
       }
       tick()
 
     } catch (err) {
+      if (!mountedRef.current) return
       setPhase('ready')
       setError(err instanceof Error ? err.message : 'Spin failed — try again')
     }
@@ -81,6 +101,8 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
 
   const noun = poolType === 'racing' ? 'runner' : 'team'
   const isResult = phase === 'result'
+  const isSpinning = phase === 'spinning'
+  const isHereWeGo = phase === 'here-we-go'
 
   return (
     <div style={{
@@ -90,10 +112,9 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
       alignItems: 'center', justifyContent: 'center',
       padding: 24, textAlign: 'center',
     }}>
-      {/* Confetti burst on reveal */}
       <Confetti active={revealed} />
 
-      {phase !== 'spinning' && (
+      {!isSpinning && !isHereWeGo && (
         <button
           className="btn-icon"
           style={{ position: 'absolute', top: 'calc(18px + env(safe-area-inset-top))', left: 16, zIndex: 2 }}
@@ -123,11 +144,12 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
         background: isResult ? 'rgba(52,211,153,0.06)' : 'rgba(255,255,255,0.03)',
         boxShadow: isResult ? '0 0 56px rgba(52,211,153,0.18)' : 'none',
         transition: 'border-color 0.5s, background 0.5s, box-shadow 0.6s',
-        overflow: 'hidden',
-        position: 'relative', zIndex: 2,
+        overflow: 'hidden', position: 'relative', zIndex: 2,
       }}>
-        {phase === 'ready' ? (
-          <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Press spin</span>
+        {phase === 'ready' || isHereWeGo ? (
+          <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+            {isHereWeGo ? '…' : 'Press spin'}
+          </span>
         ) : (
           <div style={{
             padding: '0 18px',
@@ -139,8 +161,7 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
           }}>
             <div style={{
               fontSize: displayName.length > 14 ? 15 : displayName.length > 10 ? 18 : 22,
-              fontWeight: 800,
-              lineHeight: 1.3,
+              fontWeight: 800, lineHeight: 1.3,
               color: isResult ? 'var(--emerald)' : 'var(--text-primary)',
               transition: 'color 0.4s',
             }}>
@@ -166,10 +187,13 @@ export default function SpinScreen({ competitionId, entry, poolType, poolOptions
         </button>
       )}
 
-      {phase === 'spinning' && (
-        <div style={{ color: 'var(--text-secondary)', fontSize: 13, position: 'relative', zIndex: 2 }}>
-          <span className="spinner" style={{ width: 14, height: 14, verticalAlign: 'middle', marginRight: 8 }} />
-          Drawing…
+      {isHereWeGo && (
+        <div style={{
+          fontSize: 22, fontWeight: 800, color: 'var(--indigo)',
+          animation: 'pulse 0.6s ease-in-out infinite',
+          position: 'relative', zIndex: 2,
+        }}>
+          Here we go!
         </div>
       )}
 
@@ -212,7 +236,6 @@ function Confetti({ active }: { active: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number>()
 
-  // Each time active flips to true, fire a fresh burst
   useEffect(() => {
     if (!active) return
     const canvas = canvasRef.current
@@ -221,7 +244,6 @@ function Confetti({ active }: { active: boolean }) {
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
 
-    // Burst origin: centre of screen, slightly above mid (where the wheel is)
     const ox = canvas.width / 2
     const oy = canvas.height * 0.42
 
@@ -231,7 +253,7 @@ function Confetti({ active }: { active: boolean }) {
       return {
         x: ox, y: oy,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 4, // bias upward
+        vy: Math.sin(angle) * speed - 4,
         rot: Math.random() * Math.PI * 2,
         vrot: (Math.random() - 0.5) * 0.25,
         color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
@@ -247,12 +269,9 @@ function Confetti({ active }: { active: boolean }) {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       let alive = false
       for (const p of pieces) {
-        p.x += p.vx
-        p.y += p.vy
-        p.vy += 0.28        // gravity
-        p.vx *= 0.995       // slight air resistance
-        p.rot += p.vrot
-        p.opacity -= 0.012
+        p.x += p.vx; p.y += p.vy
+        p.vy += 0.28; p.vx *= 0.995
+        p.rot += p.vrot; p.opacity -= 0.012
         if (p.opacity <= 0) continue
         alive = true
         ctx.save()
@@ -273,11 +292,7 @@ function Confetti({ active }: { active: boolean }) {
   return (
     <canvas
       ref={canvasRef}
-      style={{
-        position: 'absolute', inset: 0,
-        width: '100%', height: '100%',
-        pointerEvents: 'none', zIndex: 1,
-      }}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}
     />
   )
 }
