@@ -446,11 +446,10 @@ function DrawTab({ detail, onSpin }: {
           <div className="section-label" style={{ marginBottom: 8 }}>To draw</div>
           <div className="card" style={{ padding: 0, marginBottom: 16 }}>
             {unspun.map(e => (
-              <div key={e.id} className="list-item">
+              <div key={e.id} className="list-item" onClick={() => onSpin(e)}
+                style={{ cursor: 'pointer' }}>
                 <span style={{ fontWeight: 600 }}>{e.playerName}</span>
-                <button className="btn btn-primary btn-sm" onClick={() => onSpin(e)}>
-                  Spin
-                </button>
+                <i className="ti ti-chevron-right" style={{ color: 'var(--text-tertiary)', fontSize: 16 }} />
               </div>
             ))}
           </div>
